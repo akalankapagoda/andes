@@ -3559,11 +3559,6 @@ public abstract class AMQSession<C extends BasicMessageConsumer, P extends Basic
                         }
                     }
                 }
-                // Don't reject if we're already closing
-                if (!_closed.get())
-                {
-                    rejectMessage(message, true);
-                }
             }
             else
             {
