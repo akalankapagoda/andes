@@ -19,6 +19,7 @@ package org.wso2.andes.server;
 
 import org.apache.log4j.Logger;
 import org.wso2.andes.AMQException;
+import org.wso2.andes.AMQInternalException;
 import org.wso2.andes.AMQSecurityException;
 import org.wso2.andes.amqp.AMQPUtils;
 import org.wso2.andes.amqp.QpidAndesBridge;
@@ -212,23 +213,19 @@ public class AMQChannel implements SessionConfig, AMQSessionModel
         _id = getConfigStore().createId();
         _actor.message(ChannelMessages.CREATE());
 
-        getConfigStore().addConfiguredObject(this);
-
-        _messageStore = messageStore;
-
-        // by default the session is non-transactional
-        _transaction = new AutoCommitTransaction(_messageStore);
-
         // message tracking related to this channel is initialised
         Andes.getInstance().clientConnectionCreated(_id);
         beginPublisherTransaction = false;
-
+        
+        //Set channel details
+        //Substring to remove leading slash character from address
         String andesChannelId = AMQPUtils.DEFAULT_ANDES_CHANNEL_IDENTIFIER;
         if (null != ((AMQProtocolEngine) this._session).getAddress()) {
             andesChannelId = ((AMQProtocolEngine) this._session).getAddress().substring(1);
         }
 
-        andesChannel = Andes.getInstance().createChannel(andesChannelId, new FlowControlListener() {
+
+        FlowControlListener flowControlListener = new FlowControlListener() {
             @Override
             public void block() {
                 if (!isSubscriptionChannel()) {
@@ -242,11 +239,35 @@ public class AMQChannel implements SessionConfig, AMQSessionModel
                     unblockChannel();
                 }
             }
-        });
+            
+            @Override
+            public void disconnect(){
+                try {
+                    mgmtClose();
+                } catch (AMQException e) {
+                    _logger.error("error occured while trying to disconnect channel. Id: " + _channelId, e);
+                }
+            }
+        };
+        
+        try {
+            andesChannel = Andes.getInstance().createChannel(andesChannelId, flowControlListener);
+        } catch (Exception ex) {
+            throw new AMQInternalException("unable to create channel due to internal server error",
+                                           ex);
+        }
+        
+        
+        
+        
+        getConfigStore().addConfiguredObject(this);
 
-        //Set channel details
-        //Substring to remove leading slash character from address
+        _messageStore = messageStore;
 
+        // by default the session is non-transactional
+        _transaction = new AutoCommitTransaction(_messageStore);
+
+     
         try {
             _managedObject = new AMQChannelMBean(this);
             _managedObject.register();
@@ -258,6 +279,19 @@ public class AMQChannel implements SessionConfig, AMQSessionModel
     public ConfigStore getConfigStore()
     {
         return getVirtualHost().getConfigStore();
+    }
+
+    /**
+     * Reschedule recovered messages to be resent
+     *
+     * @param recovererMsgs Map of recovered messages
+     */
+    public void resendRecoveredMessages(Map<Long, QueueEntry> recovererMsgs) {
+        try {
+            QpidAndesBridge.recover(recovererMsgs.values(), this);
+        } catch (AMQException e ) {
+            _logger.error("Error while resending recovered messages.", e);
+        }
     }
 
     /** Sets this channel to be part of a local transaction */
@@ -832,13 +866,13 @@ public class AMQChannel implements SessionConfig, AMQSessionModel
     }
 
     /**
-     * Called to resend all outstanding unacknowledged messages to this same channel.
+     * Called to recover all outstanding unacknowledged messages to this same channel.
      *
      * @param requeue Are the messages to be requeued or dropped.
      *
      * @throws AMQException When something goes wrong.
      */
-    public void resend(final boolean requeue) throws AMQException
+    public Map<Long, QueueEntry> recoverMessages(final boolean requeue) throws AMQException
     {
 
 
@@ -944,6 +978,8 @@ public class AMQChannel implements SessionConfig, AMQSessionModel
             message.release();
 
         }
+
+        return msgToRequeue;
     }
 
     public boolean isMessagesAcksProcessing = false;

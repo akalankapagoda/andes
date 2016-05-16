@@ -44,6 +44,12 @@ public enum AndesConfiguration implements ConfigurationProperty {
     COORDINATION_THRIFT_SERVER_PORT
             ("coordination/thriftServerPort", "7611", Integer.class),
 
+            
+    /**
+     * Socket timeout for thrift connection.
+     */
+    COORDINATION_THRIFT_SO_TIMEOUT("coordination/thriftSOTimeout", "0", Integer.class),
+        
     /**
      * Thrift server reconnect timeout. Value specified in SECONDS
      */
@@ -554,6 +560,12 @@ public enum AndesConfiguration implements ConfigurationProperty {
             "/maximumMessageDisplayLength", "100000", Integer.class),
 
     /**
+     * Enable users to all reroute messages from a specific destination(queue or durable topic) to a specific queue.
+     */
+    MANAGEMENT_CONSOLE_ALLOW_REREOUTE_ALL_IN_DLC("managementConsole" +
+                                                "/allowReRouteAllInDLC", "false", Boolean.class),
+
+    /**
      * This is the per publisher buffer size low limit which disable the flow control for a channel if the flow-control
      * was enabled previously.
      */
@@ -595,7 +607,27 @@ public enum AndesConfiguration implements ConfigurationProperty {
     /**
      * Enable RDBMS slot information store
      */
-    SLOT_MANAGEMENT_STORAGE("slotManagement/storage", "RDBMS", String.class);
+    SLOT_MANAGEMENT_STORAGE("slotManagement/storage", "RDBMS", String.class),
+
+    /**
+     * Enable network partition detection ( and surrounding functionality, such
+     * as disconnecting subscriptions, enabling error based flow control if the
+     * minimal node count becomes less than configured value.
+     * <p>
+     * default value: false
+     * </p>
+     */
+    RECOVERY_NETWORK_PARTITIONS_DETECTION("recovery/networkPartitionsDetection/@enabled", "false",
+                                          Boolean.class),
+
+    /**
+     * The minimum node count the cluster should maintain for this node to
+     * operate. if cluster size becomes less that configured value
+     * This node will not accept any incoming traffic ( and disconnect
+     * subscriptions) etc.
+     */
+    RECOVERY_NETWORK_PARTITIONS_MINIMUM_CLUSTER_SIZE("recovery/networkPartitionsDetection/minimumClusterSize",
+                                                     "1", Integer.class);
 
     /**
      * Meta data about configuration.

@@ -39,7 +39,6 @@ import org.wso2.andes.client.state.listener.SpecificMethodFrameListener;
 import org.wso2.andes.codec.AMQCodecFactory;
 import org.wso2.andes.framing.*;
 import org.wso2.andes.pool.Job;
-import org.wso2.andes.pool.ReferenceCountingExecutorService;
 import org.wso2.andes.protocol.AMQConstant;
 import org.wso2.andes.protocol.AMQMethodEvent;
 import org.wso2.andes.protocol.AMQMethodListener;
@@ -48,6 +47,7 @@ import org.wso2.andes.thread.Threading;
 import org.wso2.andes.transport.Sender;
 import org.wso2.andes.transport.network.NetworkConnection;
 import org.wso2.andes.transport.network.NetworkTransport;
+import org.wso2.andes.client.pool.ReferenceCountingClientExecutorService;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -164,7 +164,7 @@ public class AMQProtocolHandler implements ProtocolEngine
     private AMQCodecFactory _codecFactory;
     private Job _readJob;
     private Job _writeJob;
-    private ReferenceCountingExecutorService _poolReference = ReferenceCountingExecutorService.getInstance();
+    private ReferenceCountingClientExecutorService _poolReference = ReferenceCountingClientExecutorService.getInstance();
     private ProtocolVersion _suggestedProtocolVersion;
 
     private long _writtenBytes;
@@ -705,16 +705,21 @@ public class AMQProtocolHandler implements ProtocolEngine
             try
             {
                 syncWrite(frame, ConnectionCloseOkBody.class, timeout);
-                _network.close();
-                closed();
             }
             catch (AMQTimeoutException e)
             {
-                closed();
+                String error = "AMQP timed out when attempting to close the connection ";
+                _logger.error(error,e);
+                throw new AMQException(error,e);
             }
             catch (FailoverException e)
             {
                 _logger.debug("FailoverException interrupted connection close, ignoring as connection   close anyway.");
+            } finally {
+                if(null != _network){
+                    _network.close();
+                }
+                closed();
             }
         }
 
