@@ -19,8 +19,8 @@
 package org.wso2.andes.kernel.disruptor.inbound;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.lmax.disruptor.BlockingWaitStrategy;
 import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.SleepingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import org.apache.commons.logging.Log;
@@ -112,7 +112,7 @@ public class InboundEventManager {
                 bufferSize,
                 executorPool,
                 ProducerType.MULTI,
-                new BlockingWaitStrategy());
+                new SleepingWaitStrategy());
 
         disruptor.handleExceptionsWith(new LogExceptionHandler());
 
