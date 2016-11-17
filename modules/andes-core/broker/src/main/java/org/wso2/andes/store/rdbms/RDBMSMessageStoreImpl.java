@@ -1132,6 +1132,7 @@ public class RDBMSMessageStoreImpl implements MessageStore {
             }
         } catch (SQLException e) {
             rollback(connection, RDBMSConstants.TASK_DELETING_METADATA_FROM_QUEUE + storageQueueName);
+            printRollbackedMetadata(messagesToRemove);
             throw rdbmsStoreUtils.convertSQLException("error occurred while deleting message metadata from queue ",
                     e);
         } finally {
@@ -1182,6 +1183,7 @@ public class RDBMSMessageStoreImpl implements MessageStore {
         } catch (SQLException e) {
             rollback(connection, RDBMSConstants.TASK_DELETING_METADATA_FROM_QUEUE + storageQueueName
                      + " and " + RDBMSConstants.TASK_DELETING_MESSAGE_PARTS);
+            printRollbackedMetadata(messagesToRemove);
             throw rdbmsStoreUtils.convertSQLException("error occurred while deleting message metadata and content for "
                                                       + "queue ", e);
         } finally {
@@ -1190,6 +1192,16 @@ public class RDBMSMessageStoreImpl implements MessageStore {
             close(connection, metadataRemovalPreparedStatement, RDBMSConstants.TASK_DELETING_METADATA_FROM_QUEUE
                   + storageQueueName + " and " + RDBMSConstants.TASK_DELETING_MESSAGE_PARTS);
         }
+    }
+
+    private void printRollbackedMetadata(List<AndesMessageMetadata> metaDataList) {
+        StringBuilder sb = new StringBuilder();
+        for (AndesMessageMetadata metadata : metaDataList) {
+            sb.append(metadata.getMessageID()).append(", ");
+        }
+
+        log.warn("Rolled back messages : " + sb.toString());
+
     }
 
     /**
