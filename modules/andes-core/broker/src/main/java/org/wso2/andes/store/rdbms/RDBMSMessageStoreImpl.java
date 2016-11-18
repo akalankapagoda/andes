@@ -1106,6 +1106,8 @@ public class RDBMSMessageStoreImpl implements MessageStore {
                                                List<AndesMessageMetadata> messagesToRemove)
             throws AndesException {
 
+        deleteMessageContent(messagesToRemove);
+
         Connection connection = null;
         PreparedStatement preparedStatement = null;
 
@@ -1149,6 +1151,9 @@ public class RDBMSMessageStoreImpl implements MessageStore {
     public void deleteMessages(final String storageQueueName,
                                List<AndesMessageMetadata> messagesToRemove)
             throws AndesException {
+
+        deleteMessageContent(messagesToRemove);
+
         Connection connection = null;
         PreparedStatement metadataRemovalPreparedStatement = null;
 
@@ -1191,6 +1196,37 @@ public class RDBMSMessageStoreImpl implements MessageStore {
             contextWrite.stop();
             close(connection, metadataRemovalPreparedStatement, RDBMSConstants.TASK_DELETING_METADATA_FROM_QUEUE
                   + storageQueueName + " and " + RDBMSConstants.TASK_DELETING_MESSAGE_PARTS);
+        }
+    }
+
+    private void deleteMessageContent(List<AndesMessageMetadata> metadataList) throws AndesException {
+        Connection connection = null;
+        PreparedStatement contentRemovalPreparedStatement = null;
+
+        try {
+            connection = getConnection();
+
+            //Since referential integrity is imposed on the two tables: message content and metadata,
+            //deleting message metadata will cause message content to be automatically deleted
+            contentRemovalPreparedStatement = connection.prepareStatement(RDBMSConstants.PS_DELETE_CONTENT);
+
+            for (AndesMessageMetadata message : metadataList) {
+                //add parameters to delete metadata
+                contentRemovalPreparedStatement.setLong(1, message.getMessageID());
+                contentRemovalPreparedStatement.addBatch();
+            }
+
+            contentRemovalPreparedStatement.executeBatch();
+            connection.commit();
+
+            if (log.isDebugEnabled()) {
+                log.debug("Content removed: " + metadataList.size());
+            }
+        } catch (SQLException e) {
+            rollback(connection, RDBMSConstants.TASK_DELETING_MESSAGE_PARTS);
+            throw rdbmsStoreUtils.convertSQLException("error occurred while deleting message content for queue ", e);
+        } finally {
+            close(connection, contentRemovalPreparedStatement, RDBMSConstants.TASK_DELETING_MESSAGE_PARTS);
         }
     }
 
