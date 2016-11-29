@@ -107,6 +107,10 @@ public class SlotDeliveryWorker extends Thread implements StoreHealthListener, N
      * queue ( in the errors occur in message stores)
      */
     private static final int MAX_META_DATA_RETRIEVAL_COUNT = 5;
+
+    String nodeId;
+
+    SlotThriftClient slotThriftClient;
     
     public SlotDeliveryWorker() {
         messageFlusher = MessageFlusher.getInstance();
@@ -122,6 +126,10 @@ public class SlotDeliveryWorker extends Thread implements StoreHealthListener, N
             // network partition detection works only when clustered.
             andesContext.getClusterAgent().addNetworkPartitionListener(30 + ID_GENERATOR.incrementAndGet(), this);
         }
+
+        nodeId = AndesContext.getInstance().getClusterAgent().getLocalNodeIdentifier();
+
+        slotThriftClient = new SlotThriftClient();
     }
 
     public void rescheduleMessagesForDelivery(String storageQueueName, List<DeliverableAndesMetadata> messages) {
@@ -430,7 +438,7 @@ public class SlotDeliveryWorker extends Thread implements StoreHealthListener, N
          }
     	
         long startTime = System.currentTimeMillis();
-        Slot currentSlot = slotCoordinator.getSlot(storageQueueName);
+        Slot currentSlot = slotThriftClient.getSlot(storageQueueName, nodeId);
         long endTime = System.currentTimeMillis();
 
         if (log.isDebugEnabled()) {
